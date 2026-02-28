@@ -1,0 +1,137 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  STUDENT
+  PROFESSOR
+  CLUB_MANAGER
+  LAB_TECH
+  LHC
+  ADMIN
+}
+
+enum ResourceOwnerType {
+  CLUB
+  DEPARTMENT
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  WAITLISTED
+  OVERRIDDEN
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  password     String
+  name         String
+  role         Role
+  rollNumber   String?
+  departmentId Int?
+  clubId       Int?
+  createdAt    DateTime  @default(now())
+
+  department   Department? @relation(fields: [departmentId], references: [id])
+  club         Club?       @relation("ClubMembers", fields: [clubId], references: [id])
+  managedClub  Club?       @relation("ClubManager")
+
+  resourceRequests ResourceRequest[]
+  roomBookings     RoomBooking[]
+  logs             Log[]
+}
+
+model Department {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  resources Resource[]
+  users     User[]
+}
+
+model Club {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  managerId Int        @unique
+  manager   User       @relation("ClubManager", fields: [managerId], references: [id])
+  resources Resource[]
+  members   User[]     @relation("ClubMembers")
+}
+
+model Resource {
+  id           Int               @id @default(autoincrement())
+  name         String
+  description  String?
+  quantity     Int
+  ownerType    ResourceOwnerType
+  departmentId Int?
+  clubId       Int?
+  createdAt    DateTime          @default(now())
+
+  department   Department?       @relation(fields: [departmentId], references: [id])
+  club         Club?             @relation(fields: [clubId], references: [id])
+  requests     ResourceRequest[]
+}
+
+model ResourceRequest {
+  id            Int           @id @default(autoincrement())
+  resourceId    Int
+  requesterId   Int
+  quantity      Int
+  startTime     DateTime
+  endTime       DateTime
+  status        RequestStatus @default(PENDING)
+  rollNumber    String?
+  reason        String?
+  queuePosition Int?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  resource  Resource @relation(fields: [resourceId], references: [id])
+  requester User     @relation(fields: [requesterId], references: [id])
+}
+
+model Room {
+  id       Int           @id @default(autoincrement())
+  name     String        @unique
+  capacity Int
+  bookings RoomBooking[]
+}
+
+model RoomBooking {
+  id            Int           @id @default(autoincrement())
+  roomId        Int
+  requesterId   Int
+  startTime     DateTime
+  endTime       DateTime
+  purpose       String?
+  status        RequestStatus @default(PENDING)
+  queuePosition Int?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  room      Room @relation(fields: [roomId], references: [id])
+  requester User @relation(fields: [requesterId], references: [id])
+}
+
+model Log {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  role       Role
+  action     String
+  entityType String
+  entityId   Int
+  oldState   String?
+  newState   String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
